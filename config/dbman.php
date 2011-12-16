@@ -15,5 +15,5 @@ return array
 	 *
 	 * string   path		the path to the update files
 	 */
-	'path' => MODPATH.'dbman/migrations/'
+	'path' => 'config/dbman/migrations/'
 );

@@ -10,8 +10,10 @@
 
 class Controller_Dbman extends Controller
 {
-	public function action_update($version = null)
+	public function action_update()
 	{
-		Dbman::factory()->update($version);
+		$module =  $this->request->param('module');
+		$version = $this->request->param('version');
+		Dbman::factory()->update($module, $version);
 	}
 }

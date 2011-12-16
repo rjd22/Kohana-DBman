@@ -20,9 +20,9 @@ class Dbman
 		return new Dbman;
 	}
 
-	public function update($version = null)
+	public function update($module = null, $version = null)
 	{
 		$dbman = new Model_Dbman;
-		$dbman->update($version);
+		$dbman->update($module, $version);
 	}
 }

@@ -28,6 +28,7 @@ class Model_Dbman
 				CREATE TABLE schema_version
 				(
 				    id int(11) NOT NULL AUTO_INCREMENT,
+				    module VARCHAR(100) NOT NULL,
 				    version int(11) NOT NULL,
 				    name VARCHAR(100) NOT NULL,
 				    extra VARCHAR(100) NOT NULL,
@@ -37,17 +38,39 @@ class Model_Dbman
 		}
 	}
 
-	public function update($version = null)
+	public function update($module = null, $version = null)
+	{
+		
+		if (isset($module) or isset($version))
+		{
+			if (null === $module)
+			{
+				$module = '';
+			}
+			$this->update_module($module, $version);
+		}
+		else
+		{
+			$this->update_module('');
+			foreach (Kohana::modules() as $module => $path)
+			{
+				$this->update_module($module);
+			}
+		}
+		
+	}
+	
+	public function update_module($module, $version = null)
 	{
 		//check what version the database is on.
-		$dbversion = $this->get_db_version();
-		$version = (!$version) ? $this->get_migration_version() : $version;
+		$dbversion = $this->get_db_version($module);
+		$version = (!isset($version)) ? $this->get_migration_version($module) : $version;
 		
 		//Check the direction you want to update to
 		$direction = ($dbversion < $version) ? 'up' : 'down';
 		
 		//if not the latest version. Update.
-		$migrations = $this->get_migration_list($dbversion, $version);
+		$migrations = $this->get_migration_list($module, $dbversion, $version);
 		
 		foreach($migrations as $migration)
 		{
@@ -55,10 +78,11 @@ class Model_Dbman
 		}
 	}
 	
-	public function get_db_version()
+	public function get_db_version($module = '')
 	{
 		$version = DB::select()
 			->from('schema_version')
+			->where('module', '=', $module)
 			->order_by('version', 'DESC')
 			->limit(1)
 		->execute()->get('version');
@@ -66,33 +90,47 @@ class Model_Dbman
 		return ($version) ? $version : 0;
 	}
 	
-	public function get_migration_version()
+	public function get_migration_version($module = '')
 	{
-		$migations = $this->get_list();
-		$latest = end($migations);
+		$migrations = $this->get_list($module);
+		
+		$latest = end($migrations[$module]);
 		
 		preg_match('/(\d+)_([a-z_]+)/', $latest, $migration);
 		
-		return $migration[1];
+		return isset($migration[1]) ? $migration[1] : 0;
 	}
 	
 	public function get_list($order = 'DESC')
 	{
-		$files = array();
+		$files = array('' => array());
 		$order = ($order == 'DESC') ? 0 : 1;
-
-		foreach(scandir($this->_directory, $order) as $file) 
+		
+		foreach(scandir(APPPATH.$this->_directory, $order) as $file) 
 		{
-			if(!in_array($file, array('.', '..')))
+			if (!preg_match('/^\./', basename($file)))
 			{
-				$files[] = $file;
+				$files[''][] = APPPATH.$this->_directory.$file;
 			}
 		}
-		
+		foreach(Kohana::modules() as $name => $path)
+		{
+			$files[$name] = array();
+			if (is_dir($path.$this->_directory))
+			{
+				foreach(scandir($path.$this->_directory, $order) as $file) 
+				{
+					if (!preg_match('/^\./', basename($file)))
+					{
+						$files[$name][] = $path.$this->_directory.$file;
+					}
+				}
+			}
+		}
 		return $files;
 	}
 	
-	public function get_migration_list($start_version, $stop_version)
+	public function get_migration_list($module = '', $start_version, $stop_version)
 	{
 		$migrations = array();
 		
@@ -107,17 +145,19 @@ class Model_Dbman
 			$direction = 'down';
 		}
 		
-		foreach($this->get_list() as $file) 
+		$list = $this->get_list();
+		foreach($list[$module] as $file)
 		{
-			if(preg_match('/(\d+)_([a-z_]+)/', $file, $file))
+			
+			if(preg_match('/(\d+)_([a-z_]+)/', $file, $file_parts))
 			{
-				$version 	= $file[1];
-				$class	= $file[2];
-				$file	= $file[0];
+				$version 	= $file_parts[1];
+				$class	= $file_parts[2];
 				
 				if($version > $start && $version <= $stop)
 				{
 					$migrations[$version] = array(
+						'module' => $module,
 						'version' => $version,
 						'file' 	=> $file,
 						'class'	=> $class
@@ -136,7 +176,7 @@ class Model_Dbman
 	{
 		extract($migration);
 		
-		require_once($this->_directory.'/'.$file.'.php');
+		require_once($file);
 		
 		if(!class_exists($class, false))
 		{
@@ -145,17 +185,20 @@ class Model_Dbman
 		
 		$migration = new $class();
 		$migration->$direction();
+		echo get_class($migration), "->{$direction}<br />\n";
 		
 		if($direction == 'up')
 		{
-			DB::query(Database::INSERT, 'INSERT INTO schema_version (version, name) VALUES (:version, :name)')
+			DB::query(Database::INSERT, 'INSERT INTO schema_version (module, version, name) VALUES (:module, :version, :name)')
+				->bind(':module', $module)
 				->bind(':version', $version)
 				->bind(':name', $class)
 			->execute();
 		}
 		else
 		{
-			DB::query(Database::DELETE, 'DELETE FROM schema_version WHERE version = :version')
+			DB::query(Database::DELETE, 'DELETE FROM schema_version WHERE module = :module AND version = :version')
+				->bind(':module', $module)
 				->bind(':version', $version)
 			->execute();
 		}

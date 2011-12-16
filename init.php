@@ -8,7 +8,7 @@
 * @license        http://www.opensource.org/licenses/isc-license.txt
 */
 
-Route::set('default', 'dbman/<action>(/<id>)')
+Route::set('dbman_default', 'dbman/<action>(/<version>(/<module>))')
 	->defaults(array(
 		'controller' => 'dbman',
 		'action'     => 'update',

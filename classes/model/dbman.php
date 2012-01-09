@@ -14,7 +14,7 @@ class Model_Dbman
 
 	public function __construct()
 	{
-		$this->_directory = Kohana::config('dbman.path');
+		$this->_directory = Kohana::$config->load('dbman.path');
 		
 		//check if the versioning table exists
 		$table = DB::query(null, '

@@ -64,7 +64,7 @@ class Model_Dbman
 	{
 		//check what version the database is on.
 		$dbversion = $this->get_db_version($module);
-		$version = (!isset($version)) ? $this->get_migration_version($module) : $version;
+		$version = (isset($version)) ? $version : $this->get_migration_version($module);
 		
 		//Check the direction you want to update to
 		$direction = ($dbversion < $version) ? 'up' : 'down';
@@ -94,6 +94,7 @@ class Model_Dbman
 	{
 		$migrations = $this->get_list($module);
 		
+		sort($migrations[$module]);
 		$latest = end($migrations[$module]);
 		
 		preg_match('/(\d+)_([a-z_]+)/', $latest, $migration);
@@ -106,11 +107,13 @@ class Model_Dbman
 		$files = array('' => array());
 		$order = ($order == 'DESC') ? 0 : 1;
 		
-		foreach(scandir(APPPATH.$this->_directory, $order) as $file) 
-		{
-			if (!preg_match('/^\./', basename($file)))
+		if (is_dir(APPPATH.$this->_directory)) {
+			foreach(scandir(APPPATH.$this->_directory, $order) as $file) 
 			{
-				$files[''][] = APPPATH.$this->_directory.$file;
+				if (!preg_match('/^\./', basename($file)))
+				{
+					$files[''][] = APPPATH.$this->_directory.$file;
+				}
 			}
 		}
 		foreach(Kohana::modules() as $name => $path)
@@ -176,14 +179,16 @@ class Model_Dbman
 	{
 		extract($migration);
 		
-		require_once($file);
+		require_once $file;
 		
-		if(!class_exists($class, false))
+		$class_name = 'Migration_' . $class;
+		
+		if(!class_exists($class_name, false))
 		{
-			die;
+			throw new Exception("{$class_name} does not exist in {$file}");
 		}
 		
-		$migration = new $class();
+		$migration = new $class_name();
 		$migration->$direction();
 		echo get_class($migration), "->{$direction}<br />\n";
 		

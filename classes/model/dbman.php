@@ -28,10 +28,10 @@ class Model_Dbman
 				CREATE TABLE schema_version
 				(
 				    id int(11) NOT NULL AUTO_INCREMENT,
-				    module VARCHAR(100) NOT NULL,
-				    version int(11) NOT NULL,
-				    name VARCHAR(100) NOT NULL,
-				    extra VARCHAR(100) NOT NULL,
+				    module VARCHAR(100) NOT NULL DEFAULT "",
+				    version int(11) NOT NULL DEFAULT 0,
+				    name VARCHAR(100) NOT NULL DEFAULT "",
+				    extra VARCHAR(100) NOT NULL DEFAULT "",
 				    PRIMARY KEY (id)
 				);
 			')->execute();
